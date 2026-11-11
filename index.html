@@ -1,0 +1,696 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Angle Load Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: one reading column with a sticky section row; a command builder and a CSV viewer are the two working tools. */
+:root {
+  --bg: #F3F6F7;
+  --surface: #FFFFFF;
+  --surface-2: #EAF0F2;
+  --ink: #13202A;
+  --muted: #566772;
+  --line: #D5DEE3;
+  --accent: #0B7A75;
+  --accent-ink: #FFFFFF;
+  --ok: #1E7B3E;
+  --warn: #A9560A;
+  --crit: #B3261E;
+  --code-bg: #0F1B22;
+  --code-ink: #D6E4EA;
+  --code-dim: #7F97A3;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C1419; --surface: #131E25; --surface-2: #1A2830; --ink: #E3ECF0; --muted: #94A7B1;
+    --line: #26363F; --accent: #3FC8BD; --accent-ink: #06201E; --ok: #5CCB86; --warn: #E5A25B; --crit: #F2827A;
+    --code-bg: #0A1116; --code-ink: #D6E4EA; --code-dim: #7F97A3;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C1419; --surface: #131E25; --surface-2: #1A2830; --ink: #E3ECF0; --muted: #94A7B1;
+  --line: #26363F; --accent: #3FC8BD; --accent-ink: #06201E; --ok: #5CCB86; --warn: #E5A25B; --crit: #F2827A;
+  --code-bg: #0A1116; --code-ink: #D6E4EA; --code-dim: #7F97A3;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 56px;
+}
+.wrap { max-width: 980px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+p { margin: 0 0 10px; max-width: 70ch; }
+a { color: var(--accent); }
+code, pre, .mono { font-family: var(--font-mono); font-size: 13px; }
+code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header.top { padding: 40px 0 18px; }
+.lede { font-size: 17px; color: var(--muted); max-width: 64ch; margin-top: 10px; }
+nav.sections {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+  display: flex; gap: 4px 18px; flex-wrap: wrap; padding: 10px 0; margin-bottom: 8px;
+}
+nav.sections a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 2px 0; }
+nav.sections a:hover { color: var(--accent); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+
+section { padding: 30px 0 6px; scroll-margin-top: 56px; }
+.sub { color: var(--muted); margin-bottom: 16px; max-width: 70ch; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.grid2 > * { min-width: 0; }
+
+/* what it checks */
+.checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 8px; }
+.checks > div { border-top: 2px solid var(--accent); padding-top: 8px; min-width: 0; }
+.checks b { font-family: var(--font-display); display: block; font-size: 15px; }
+.checks span { color: var(--muted); font-size: 14px; }
+
+/* diagram */
+.diagram { width: 100%; height: auto; display: block; }
+.diagram .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.diagram .box-acc { fill: var(--surface-2); stroke: var(--accent); stroke-width: 1.5; }
+.diagram text { fill: var(--ink); font-family: var(--font-body); font-size: 13px; }
+.diagram .t-mono { font-family: var(--font-mono); font-size: 11.5px; fill: var(--muted); }
+.diagram .t-dim { fill: var(--muted); font-size: 12px; }
+.diagram .t-b { font-weight: 600; font-size: 14px; font-family: var(--font-display); }
+.diagram .line { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+.diagram .head { fill: var(--accent); }
+
+/* builder */
+.builder { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .03em; text-transform: uppercase; }
+.field input {
+  font: 500 14px var(--font-mono); background: var(--bg); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0; width: 100%;
+}
+.field small { color: var(--muted); font-size: 12px; }
+.derived { margin: 14px 0 4px; display: flex; gap: 8px 22px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+.derived b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 18px 0 12px; }
+.seg button {
+  font: 500 13px var(--font-body); background: var(--surface); color: var(--muted);
+  border: 0; padding: 7px 14px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.step { margin-top: 14px; }
+.step-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.step-head span { font-weight: 600; font-size: 14px; }
+.step-head em { color: var(--muted); font-style: normal; font-size: 13px; }
+.codebox { position: relative; background: var(--code-bg); border-radius: 8px; }
+.codebox pre { margin: 0; padding: 14px 16px; color: var(--code-ink); overflow-x: auto; white-space: pre; line-height: 1.55; }
+.copy {
+  font: 500 12px var(--font-body); background: transparent; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 6px; padding: 4px 10px; cursor: pointer;
+}
+.copy:hover { background: var(--accent); color: var(--accent-ink); }
+.note { color: var(--muted); font-size: 13px; margin-top: 10px; max-width: 80ch; }
+
+/* tables */
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: var(--surface-2); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td code { white-space: nowrap; }
+
+/* sample output */
+.out { background: var(--code-bg); color: var(--code-ink); border-radius: 8px; overflow-x: auto; }
+.out pre { margin: 0; padding: 14px 16px; line-height: 1.6; }
+.out .dim { color: var(--code-dim); }
+.out .hi { color: #7FD6CE; }
+.out .bad { color: #F2A29B; }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--warn); border: 1px solid var(--warn); border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
+
+/* viewer */
+.vbar { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; margin-bottom: 14px; }
+.vbar .field { width: 150px; }
+.btn {
+  font: 500 14px var(--font-body); background: var(--accent); color: var(--accent-ink);
+  border: 1px solid var(--accent); border-radius: 8px; padding: 8px 14px; cursor: pointer;
+}
+.btn.alt { background: transparent; color: var(--accent); }
+input[type=file] { font: 13px var(--font-body); color: var(--ink); max-width: 100%; }
+.status { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; background: var(--surface); min-width: 0; }
+.tile small { display: block; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.tile b { font: 600 19px var(--font-display); font-variant-numeric: tabular-nums; }
+.tile.bad b { color: var(--crit); }
+.tile.good b { color: var(--ok); }
+.chartbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 10px 4px; }
+.chartbox .seg { margin: 4px 0 8px; }
+svg.chart { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis-t { fill: var(--muted); font: 11px var(--font-mono); }
+.chart .series { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-linejoin: round; }
+.chart .thr { stroke: var(--crit); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.chart .thr-t { fill: var(--crit); font: 11px var(--font-mono); }
+.chart .ev { fill: var(--crit); }
+.chart .ttl { fill: var(--muted); font: 11px var(--font-body); }
+.evnote { margin: 12px 0 8px; color: var(--muted); font-size: 14px; max-width: 80ch; }
+.evnote b { color: var(--ink); }
+.scroll { max-height: 280px; overflow: auto; }
+.empty { padding: 14px; color: var(--muted); }
+.pillbad { color: var(--crit); font-weight: 600; }
+.pillok { color: var(--ok); font-weight: 600; }
+
+@media (max-width: 520px) {
+  header.top { padding-top: 26px; }
+  .panel { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <h1>Angle Load Simulator</h1>
+  <p class="lede">A test tool that connects many pretend venues to the broker at once and records what each of them receives, so you can check that the roulette angle stream stays smooth when it is shared with many venues.</p>
+</header>
+
+<nav class="sections" aria-label="Sections">
+  <a href="#how">How it works</a>
+  <a href="#start">Start it</a>
+  <a href="#settings">Settings</a>
+  <a href="#output">Reading the output</a>
+  <a href="#csv">CSV file</a>
+  <a href="#viewer">Results viewer</a>
+  <a href="#fix">Problems</a>
+</nav>
+
+<section id="how">
+  <h2>What it does</h2>
+  <p class="sub">Each simulated venue is its own connection to the broker with one subscriber on <code>etg.roulette.angles.&lt;table&gt;</code>. Nothing is drawn. The tool only measures what arrives and when.</p>
+  <div class="panel">
+    <svg class="diagram" viewBox="0 0 900 250" role="img" aria-label="The central server and broker send each angle message to every simulated venue, which are all inside one simulator process on one PC.">
+      <rect class="box-acc" x="10" y="50" width="250" height="150" rx="10"/>
+      <text class="t-b" x="30" y="82">Central server + broker</text>
+      <text class="t-dim" x="30" y="104">publishes about 39 angles a second</text>
+      <text class="t-mono" x="30" y="132">tcp://192.168.0.34:61616</text>
+      <text class="t-mono" x="30" y="152">topic etg.roulette.angles.&lt;table&gt;</text>
+      <text class="t-dim" x="30" y="178">message = two floats (8 bytes)</text>
+
+      <rect class="box" x="360" y="10" width="530" height="230" rx="10" stroke-dasharray="6 5"/>
+      <text class="t-dim" x="378" y="34">Simulator: one Java process on one PC</text>
+      <g>
+        <rect class="box" x="392" y="52" width="150" height="38" rx="7"/><text x="408" y="76">Venue 1</text>
+        <rect class="box" x="392" y="102" width="150" height="38" rx="7"/><text x="408" y="126">Venue 2</text>
+        <text class="t-dim" x="408" y="162">…</text>
+        <rect class="box" x="392" y="176" width="150" height="38" rx="7"/><text x="408" y="200">Venue N</text>
+      </g>
+      <text class="t-dim" x="568" y="82">each one has its own TCP connection</text>
+      <text class="t-dim" x="568" y="102">and one subscriber</text>
+      <text class="t-b" x="568" y="140" style="font-size:13px">For every message it records</text>
+      <text class="t-dim" x="568" y="160">the arrival time, and whether the body</text>
+      <text class="t-dim" x="568" y="178">is exactly two floats</text>
+      <text class="t-dim" x="568" y="204">Every few seconds it prints one report line.</text>
+
+      <path class="line" d="M262 90 H356"/><path class="head" d="M356 85 l10 5 -10 5z"/>
+      <path class="line" d="M262 125 H356"/><path class="head" d="M356 120 l10 5 -10 5z"/>
+      <path class="line" d="M262 160 H356"/><path class="head" d="M356 155 l10 5 -10 5z"/>
+    </svg>
+  </div>
+  <div class="checks">
+    <div><b>Arrival rate</b><span>Messages per second at each venue. The real stream is about 38.9 a second.</span></div>
+    <div><b>Gaps</b><span>The wait between two messages. A normal gap is about 26 ms.</span></div>
+    <div><b>Disconnects</b><span>A venue whose connection reports an error is counted.</span></div>
+    <div><b>Silent and malformed</b><span>Venues that received nothing, and messages that are not two floats.</span></div>
+  </div>
+</section>
+
+<section id="start">
+  <h2>Start it</h2>
+  <p class="sub">The simulator is a Java program, so it has to be started from a command window on the PC that runs it. This page cannot launch it. Fill in the settings and copy the three steps.</p>
+  <div class="panel">
+    <div class="builder">
+      <div class="field"><label for="f-url">Broker URL</label><input id="f-url" value="tcp://192.168.0.34:61616" spellcheck="false"><small>The machine that runs the broker</small></div>
+      <div class="field"><label for="f-table">Table id</label><input id="f-table" value="5097" inputmode="numeric"><small>Your long run used 5097</small></div>
+      <div class="field"><label for="f-consumers">Venues</label><input id="f-consumers" value="40" inputmode="numeric"></div>
+      <div class="field"><label for="f-minutes">Minutes to run</label><input id="f-minutes" value="900" inputmode="numeric"></div>
+      <div class="field"><label for="f-interval">Report every (s)</label><input id="f-interval" value="5" inputmode="numeric"></div>
+      <div class="field"><label for="f-ramp">Pause between venues (ms)</label><input id="f-ramp" value="500" inputmode="numeric"></div>
+      <div class="field"><label for="f-hz">Expected msg/s</label><input id="f-hz" value="38" inputmode="decimal"><small>Real stream: about 38.9</small></div>
+      <div class="field"><label for="f-slow">Slow gap (ms)</label><input id="f-slow" value="300" inputmode="numeric"><small>Gaps longer than this are flagged</small></div>
+      <div class="field"><label for="f-csv">CSV file</label><input id="f-csv" value="results.csv" spellcheck="false"><small>Leave empty for none</small></div>
+    </div>
+    <div class="derived" id="derived"></div>
+
+    <div class="seg" role="group" aria-label="Command window type">
+      <button type="button" id="sh-ps" aria-pressed="true">PowerShell</button>
+      <button type="button" id="sh-cmd" aria-pressed="false">Command Prompt</button>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span>1. Go to the folder and set the classpath</span><em>once per window</em><button class="copy" type="button" data-copy="c1">Copy</button></div>
+      <div class="codebox"><pre id="c1"></pre></div>
+    </div>
+    <div class="step">
+      <div class="step-head"><span>2. Compile</span><em>only when the .java file changes</em><button class="copy" type="button" data-copy="c2">Copy</button></div>
+      <div class="codebox"><pre id="c2"></pre></div>
+    </div>
+    <div class="step">
+      <div class="step-head"><span>3. Run</span><em>Ctrl+C stops early and still prints the summary</em><button class="copy" type="button" data-copy="c3">Copy</button></div>
+      <div class="codebox"><pre id="c3"></pre></div>
+    </div>
+    <p class="note">The jar paths assume Maven already downloaded them into your <code>.m2</code> folder. If a path is different on your PC, find the file with <code>dir /s /b activemq-client-5.16.8.jar</code> and use that path. Use the PowerShell box in PowerShell and the Command Prompt box in cmd. Mixing them leaves the classpath empty.</p>
+  </div>
+</section>
+
+<section id="settings">
+  <h2>Settings</h2>
+  <p class="sub">Written as <code>name=value</code> after the class name. Every setting is optional. These are the defaults in the code.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Setting</th><th>Default</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>url</code></td><td><code>tcp://192.168.0.34:61616</code></td><td>Address of the ActiveMQ broker.</td></tr>
+      <tr><td><code>table</code></td><td><code>1</code></td><td>Table id. Each venue subscribes to <code>etg.roulette.angles.&lt;table&gt;</code>. A wrong id gives silent venues.</td></tr>
+      <tr><td><code>consumers</code></td><td><code>29</code></td><td>How many simulated venues to start. Each one gets its own connection.</td></tr>
+      <tr><td><code>minutes</code></td><td><code>30</code></td><td>How long to run. After that it prints the final summary and exits.</td></tr>
+      <tr><td><code>intervalSec</code></td><td><code>5</code></td><td>Seconds between report lines and CSV rows.</td></tr>
+      <tr><td><code>rampMs</code></td><td><code>500</code></td><td>Pause between starting one venue and the next, so you can watch a real venue as the load grows.</td></tr>
+      <tr><td><code>expectedHz</code></td><td><code>30</code></td><td>Messages per second you expect at each venue. A venue is flagged below 80% of this. The real stream is about 38.9, so 38 is a better value.</td></tr>
+      <tr><td><code>slowGapMs</code></td><td><code>100</code></td><td>A wait between two messages longer than this counts as a slow gap and flags the venue. Normal jitter of 100 to 158 ms trips the default, so 300 is better for finding real stalls.</td></tr>
+      <tr><td><code>csv</code></td><td>none</td><td>File name for one row per venue per report interval.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="output">
+  <h2>Reading the output</h2>
+  <p class="sub">After the venues start, one line is printed every report interval. A venue that looks wrong gets its own line underneath.</p>
+  <div class="out"><pre><span class="dim">Example, not a real run</span>
+<span class="dim">Broker:        tcp://192.168.0.34:61616
+Topic:         etg.roulette.angles.5097
+Venues:        40 (one connection each)
+Expected rate: 38.0 msg/s per venue
+Slow gap:      &gt; 300 ms is flagged</span>
+
+<span class="hi">[t+00:31:25]</span> venues=40  avg rate=38.9/s  min rate=38.4/s  worst gap=58 ms  flagged=0
+<span class="hi">[t+01:00:05]</span> venues=40  avg rate=32.1/s  min rate=31.6/s  worst gap=1052 ms  flagged=40
+<span class="bad">    venue  1: 31.8 msg/s, avg gap 31.4 ms, max gap 1052 ms, slow gaps 1</span>
+<span class="bad">    venue  2: 32.0 msg/s, avg gap 31.2 ms, max gap 1048 ms, slow gaps 1</span></pre></div>
+
+  <div class="tablewrap" style="margin-top:14px"><table>
+    <thead><tr><th>Part</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>[t+00:31:25]</code></td><td>Time since the simulator started, as hours:minutes:seconds.</td></tr>
+      <tr><td><code>venues=40</code></td><td>How many simulated venues are being reported.</td></tr>
+      <tr><td><code>avg rate</code></td><td>Average messages per second across all venues in the last interval.</td></tr>
+      <tr><td><code>min rate</code></td><td>The slowest venue in the last interval.</td></tr>
+      <tr><td><code>worst gap</code></td><td>The longest wait between two messages at any venue in the last interval.</td></tr>
+      <tr><td><code>flagged</code></td><td>How many venues were below 80% of <code>expectedHz</code> or had a gap longer than <code>slowGapMs</code>. Zero is a clean interval.</td></tr>
+      <tr><td><code>avg gap</code>, <code>max gap</code>, <code>slow gaps</code></td><td>For one flagged venue: its average wait between messages, its longest wait, and how many waits went over <code>slowGapMs</code>.</td></tr>
+      <tr><td><code>!! venue N connection problem</code></td><td>That venue's connection reported an error. It counts as a disconnect.</td></tr>
+      <tr><td><code>!! venue N failed to start</code></td><td>The venue could not connect. Check the URL and that the broker is running.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 style="margin-top:22px">What a healthy run looks like</h3>
+  <p>Average rate close to 38.9 a second, worst gap usually under about 60 ms, and <code>flagged=0</code> most of the time. Gaps of 100 to 158 ms show up now and then and are normal jitter.</p>
+
+  <h3 style="margin-top:18px">The final summary</h3>
+  <p>When the time is up, or when you press Ctrl+C, it prints one line per venue (messages, slow gaps, worst gap, disconnects, bad messages) and then totals. The last line says <code>RESULT: no disconnects, no silent venues, no malformed messages.</code> only when all three are zero. Slow gaps are not a pass or fail on their own. Compare them with a run that uses fewer venues.</p>
+</section>
+
+<section id="csv">
+  <h2>The CSV file</h2>
+  <p class="sub">With <code>csv=results.csv</code> the simulator adds one row per venue at every report interval. The number of rows is venues × (minutes × 60 ÷ interval).</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Column</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>time</code></td><td>Seconds since the simulator started.</td></tr>
+      <tr><td><code>venue</code></td><td>Venue number, 1 to N.</td></tr>
+      <tr><td><code>msgPerSec</code></td><td>Messages per second in that interval.</td></tr>
+      <tr><td><code>avgGapMs</code></td><td>Average wait between messages in that interval.</td></tr>
+      <tr><td><code>maxGapMs</code></td><td>Longest wait between messages in that interval. This is the column that shows a stall.</td></tr>
+      <tr><td><code>slowGaps</code></td><td>How many waits went over <code>slowGapMs</code>.</td></tr>
+      <tr><td><code>disconnects</code></td><td>Total disconnects for that venue so far.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">The viewer below reads this file in your browser. Nothing is uploaded.</p>
+</section>
+
+<section id="viewer">
+  <h2>Results viewer</h2>
+  <p class="sub">Load a <code>results.csv</code> to see the worst gap and the lowest rate over time, plus a list of the intervals where venues stalled. It opens with generated example data so you can see what a stall looks like.</p>
+  <div class="panel">
+    <div class="vbar">
+      <div class="field" style="width:auto"><label for="csvFile">Results file</label><input type="file" id="csvFile" accept=".csv,text/csv,text/plain"></div>
+      <div class="field"><label for="thr">Stall gap (ms)</label><input id="thr" value="300" inputmode="numeric"></div>
+      <button class="btn alt" type="button" id="useExample">Use example data</button>
+    </div>
+    <p class="status" id="vstatus"></p>
+    <div class="tiles" id="tiles"></div>
+    <div class="chartbox">
+      <div class="seg" role="group" aria-label="Chart series">
+        <button type="button" id="m-gap" aria-pressed="true">Worst gap</button>
+        <button type="button" id="m-rate" aria-pressed="false">Lowest rate</button>
+      </div>
+      <svg class="chart" id="chart" viewBox="0 0 900 300" role="img" aria-label="Chart of the simulator results over time"></svg>
+    </div>
+    <p class="evnote" id="evnote"></p>
+    <div class="tablewrap scroll"><table>
+      <thead><tr><th>#</th><th>Starts at</th><th class="num">Worst gap</th><th class="num">Venues hit</th><th class="num">Lowest rate</th><th class="num">After previous</th></tr></thead>
+      <tbody id="evbody"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<section id="fix">
+  <h2>Problems</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>You see</th><th>Likely reason</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>Compile errors about <code>javax.jms</code> or <code>org.apache.activemq</code></td><td>The classpath is empty or points at missing jars. In PowerShell, <code>%CP%</code> does not work.</td><td>Use the PowerShell steps in PowerShell and the Command Prompt steps in cmd. Check the jar paths exist.</td></tr>
+      <tr><td><code>failed to start</code> for every venue</td><td>The broker is not reachable.</td><td>Check the URL, that the central server is running, and that port 61616 is not blocked by a firewall.</td></tr>
+      <tr><td><code>venues that received nothing</code> is above 0</td><td>The table id is wrong, or the publisher is not sending.</td><td>Use the id of the table whose angles the real venue shows. Check that the real wheel is running.</td></tr>
+      <tr><td>Disconnects during the run</td><td>The broker restarted, or the network dropped.</td><td>Note the time and compare it with the broker log.</td></tr>
+      <tr><td>Rate low for all venues at the same moment</td><td>A pause on the broker, the network or the simulator PC.</td><td>See the notes below.</td></tr>
+      <tr><td>Old <code>time</code> values like <code>00:05:10</code> in the CSV</td><td>Older version of the file.</td><td>Use the current version, which writes seconds. The viewer reads both.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 style="margin-top:22px">What this tool cannot tell you</h3>
+  <p>All simulated venues run inside one Java process on one PC. If that PC or process freezes, every simulated venue stalls together, which looks the same as a stall on the broker side. It also measures when a message reaches the listener, not whether an animation looks smooth.</p>
+
+  <h3 style="margin-top:18px">What your long run showed</h3>
+  <p>In the 15-hour run with 40 venues there were no disconnects and no malformed messages, and the rate held at about 38.9 a second. About once an hour, every venue had one gap of 1043 to 1070 ms in the same 5-second window, and the rate in that window dropped to about 32 a second. The same hourly gap was later seen in the real venue's own log, and in the broker log at times when the simulator was not connected, so the simulator is not the cause.</p>
+</section>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- command builder ---------- */
+  var JARS = [
+    "org\\apache\\activemq\\activemq-client\\5.16.8\\activemq-client-5.16.8.jar",
+    "org\\fusesource\\hawtbuf\\hawtbuf\\1.11\\hawtbuf-1.11.jar",
+    "org\\apache\\geronimo\\specs\\geronimo-jms_1.1_spec\\1.1.1\\geronimo-jms_1.1_spec-1.1.1.jar",
+    "org\\apache\\geronimo\\specs\\geronimo-j2ee-management_1.1_spec\\1.0.1\\geronimo-j2ee-management_1.1_spec-1.0.1.jar",
+    "org\\slf4j\\slf4j-api\\1.7.36\\slf4j-api-1.7.36.jar"
+  ];
+  var shell = "ps";
+  var ids = ["url", "table", "consumers", "minutes", "interval", "ramp", "hz", "slow", "csv"];
+  function val(k) { return ($("f-" + k).value || "").trim(); }
+
+  function buildCommands() {
+    var ps = shell === "ps";
+    var m2 = ps ? "$M2" : "%M2%";
+    var cp = ps ? "$CP" : "%CP%";
+    var c1;
+    if (ps) {
+      c1 = "cd C:\\path\\to\\folder\\with\\AngleLoadSimulator.java\nmkdir out\n$M2 = \"$env:USERPROFILE\\.m2\\repository\"\n$CP = \".;" +
+        JARS.map(function (j) { return m2 + "\\" + j; }).join(";") + "\"";
+    } else {
+      c1 = "cd C:\\path\\to\\folder\\with\\AngleLoadSimulator.java\nmkdir out\nset M2=%USERPROFILE%\\.m2\\repository\nset CP=.;" +
+        JARS.map(function (j) { return m2 + "\\" + j; }).join(";");
+    }
+    var c2 = "javac -cp \"" + cp + "\" -d out AngleLoadSimulator.java";
+    var pairs = [["url", "url"], ["table", "table"], ["consumers", "consumers"], ["minutes", "minutes"],
+      ["intervalSec", "interval"], ["rampMs", "ramp"], ["expectedHz", "hz"], ["slowGapMs", "slow"], ["csv", "csv"]];
+    var args = [];
+    pairs.forEach(function (p) { var v = val(p[1]); if (v) args.push(p[0] + "=" + v); });
+    var c3 = "java -cp \"out;" + cp + "\" AngleLoadSimulator " + args.join(" ");
+    $("c1").textContent = c1; $("c2").textContent = c2; $("c3").textContent = c3;
+
+    var n = parseFloat(val("consumers")), mi = parseFloat(val("minutes")), iv = parseFloat(val("interval"));
+    var hz = parseFloat(val("hz")), sg = parseFloat(val("slow"));
+    var parts = [];
+    if (n > 0 && mi > 0 && iv > 0) {
+      var rows = Math.round(n * (mi * 60 / iv));
+      var hrs = mi / 60;
+      parts.push("Run time <b>" + (hrs >= 1 ? hrs.toFixed(1) + " h" : mi + " min") + "</b>");
+      if (val("csv")) parts.push("CSV rows about <b>" + rows.toLocaleString() + "</b>");
+    }
+    if (hz > 0) parts.push("A venue is flagged below <b>" + (hz * 0.8).toFixed(1) + " msg/s</b>");
+    if (sg > 0) parts.push("or when a gap passes <b>" + sg + " ms</b>");
+    $("derived").innerHTML = parts.map(function (p) { return "<span>" + p + "</span>"; }).join("");
+  }
+  ids.forEach(function (k) { $("f-" + k).addEventListener("input", buildCommands); });
+  function setShell(s) {
+    shell = s;
+    $("sh-ps").setAttribute("aria-pressed", s === "ps");
+    $("sh-cmd").setAttribute("aria-pressed", s === "cmd");
+    buildCommands();
+  }
+  $("sh-ps").addEventListener("click", function () { setShell("ps"); });
+  $("sh-cmd").addEventListener("click", function () { setShell("cmd"); });
+
+  function selectText(el) {
+    try { var r = document.createRange(); r.selectNodeContents(el); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) {}
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".copy"), function (b) {
+    b.addEventListener("click", function () {
+      var el = $(b.getAttribute("data-copy"));
+      var done = function (ok) {
+        b.textContent = ok ? "Copied" : "Press Ctrl+C";
+        setTimeout(function () { b.textContent = "Copy"; }, 1800);
+      };
+      try {
+        navigator.clipboard.writeText(el.textContent).then(function () { done(true); }, function () { selectText(el); done(false); });
+      } catch (e) { selectText(el); done(false); }
+    });
+  });
+  buildCommands();
+
+  /* ---------- results viewer ---------- */
+  var model = null, mode = "gap";
+
+  function parseTime(s) {
+    if (s.indexOf(":") >= 0) {
+      var p = s.split(":").map(parseFloat);
+      return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : NaN;
+    }
+    return parseFloat(s);
+  }
+  function fmtT(sec) {
+    sec = Math.round(sec);
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return "t+" + (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function parseCsv(text) {
+    var lines = text.split(/\r?\n/);
+    var byT = {}, venues = {}, disc = {}, rows = 0, bad = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      if (!ln) continue;
+      var c = ln.split(",");
+      if (c.length < 7) { if (i > 0) bad++; continue; }
+      var t = parseTime(c[0]), v = c[1], rate = parseFloat(c[2]), mg = parseFloat(c[4]), d = parseFloat(c[6]);
+      if (isNaN(t) || isNaN(rate) || isNaN(mg)) { if (i > 0) bad++; continue; }
+      rows++;
+      venues[v] = 1;
+      if (!isNaN(d) && (disc[v] === undefined || d > disc[v])) disc[v] = d;
+      var e = byT[t];
+      if (!e) { e = byT[t] = { t: t, gap: 0, rate: 1e9, vals: [] }; }
+      if (mg > e.gap) e.gap = mg;
+      if (rate < e.rate) e.rate = rate;
+      e.vals.push(mg);
+    }
+    var times = Object.keys(byT).map(parseFloat).sort(function (a, b) { return a - b; });
+    var pts = times.map(function (t) { return byT[t]; });
+    var totalDisc = 0; Object.keys(disc).forEach(function (k) { totalDisc += disc[k]; });
+    return { pts: pts, rows: rows, bad: bad, venues: Object.keys(venues).length, disc: totalDisc };
+  }
+
+  function findEvents(m, thr) {
+    var pts = m.pts, ev = [], cur = null;
+    var iv = 5;
+    if (pts.length > 1) {
+      var ds = []; for (var i = 1; i < Math.min(pts.length, 200); i++) ds.push(pts[i].t - pts[i - 1].t);
+      ds.sort(function (a, b) { return a - b; }); iv = ds[Math.floor(ds.length / 2)] || 5;
+    }
+    pts.forEach(function (p) {
+      var hit = 0; for (var j = 0; j < p.vals.length; j++) if (p.vals[j] >= thr) hit++;
+      if (hit > 0) {
+        if (cur && p.t - cur.last <= iv * 2.5) {
+          cur.last = p.t;
+        } else {
+          cur = { t: p.t, last: p.t, gap: 0, hit: 0, rate: 1e9 };
+          ev.push(cur);
+        }
+        if (p.gap > cur.gap) cur.gap = p.gap;
+        if (hit > cur.hit) cur.hit = hit;
+        if (p.rate < cur.rate) cur.rate = p.rate;
+      }
+    });
+    return ev;
+  }
+
+  function niceMax(v) {
+    var p = Math.pow(10, Math.floor(Math.log(v) / Math.LN10)), n = v / p;
+    var s = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+    return s * p;
+  }
+
+  function drawChart(m, events, thr) {
+    var svg = $("chart"), W = 900, H = 300, L = 52, R = 14, T = 22, B = 34;
+    var pts = m.pts;
+    if (!pts.length) { svg.innerHTML = ""; return; }
+    var t0 = pts[0].t, t1 = pts[pts.length - 1].t, span = Math.max(1, t1 - t0);
+    var ymax, ymin = 0, key;
+    if (mode === "gap") {
+      key = "gap";
+      var mx = 0; pts.forEach(function (p) { if (p.gap > mx) mx = p.gap; });
+      ymax = niceMax(Math.max(mx, thr * 1.2));
+    } else {
+      key = "rate";
+      var mr = 0; pts.forEach(function (p) { if (p.rate < 1e8 && p.rate > mr) mr = p.rate; });
+      ymax = niceMax(Math.max(mr, 10));
+    }
+    var X = function (t) { return L + (t - t0) / span * (W - L - R); };
+    var Y = function (v) { return T + (1 - (v - ymin) / (ymax - ymin)) * (H - T - B); };
+    var out = "";
+    out += '<text class="ttl" x="' + L + '" y="12">' + (mode === "gap" ? "Longest wait between two messages, any venue (ms)" : "Slowest venue (messages per second)") + "</text>";
+    for (var k = 0; k <= 4; k++) {
+      var yv = ymin + (ymax - ymin) * k / 4, y = Y(yv);
+      out += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/>';
+      out += '<text class="axis-t" x="' + (L - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + (yv >= 100 ? Math.round(yv) : yv.toFixed(1).replace(/\.0$/, "")) + "</text>";
+    }
+    var steps = [60, 300, 600, 1800, 3600, 7200, 21600], step = steps[steps.length - 1];
+    for (var s = 0; s < steps.length; s++) { if (span / steps[s] <= 9) { step = steps[s]; break; } }
+    for (var tt = Math.ceil(t0 / step) * step; tt <= t1; tt += step) {
+      var x = X(tt), hh = Math.floor(tt / 3600), mm = Math.floor((tt % 3600) / 60);
+      out += '<line class="grid" x1="' + x + '" x2="' + x + '" y1="' + T + '" y2="' + (H - B) + '"/>';
+      out += '<text class="axis-t" x="' + x + '" y="' + (H - B + 16) + '" text-anchor="middle">' + hh + ":" + (mm < 10 ? "0" : "") + mm + "</text>";
+    }
+    out += '<text class="axis-t" x="' + (W - R) + '" y="' + (H - 4) + '" text-anchor="end">hours:minutes since start</text>';
+    var d = "";
+    pts.forEach(function (p, i) {
+      var v = key === "rate" && p.rate > 1e8 ? 0 : p[key];
+      d += (i ? "L" : "M") + X(p.t).toFixed(1) + " " + Y(v).toFixed(1);
+    });
+    out += '<path class="series" d="' + d + '"/>';
+    if (mode === "gap" && thr <= ymax) {
+      out += '<line class="thr" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(thr) + '" y2="' + Y(thr) + '"/>';
+      out += '<text class="thr-t" x="' + (W - R) + '" y="' + (Y(thr) - 5) + '" text-anchor="end">stall gap ' + thr + " ms</text>";
+    }
+    events.forEach(function (e) {
+      out += '<path class="ev" d="M' + X(e.t) + " " + (H - B) + " l-4 7 h8z\"/>";
+    });
+    svg.innerHTML = out;
+  }
+
+  function tile(label, value, cls) {
+    return '<div class="tile ' + (cls || "") + '"><small>' + label + "</small><b>" + value + "</b></div>";
+  }
+
+  function render() {
+    if (!model) return;
+    var thr = parseFloat($("thr").value); if (!(thr > 0)) thr = 300;
+    var m = model, events = findEvents(m, thr);
+    var pts = m.pts;
+    var dur = pts.length ? pts[pts.length - 1].t - pts[0].t : 0;
+    var worst = 0, lowest = 1e9;
+    pts.forEach(function (p) { if (p.gap > worst) worst = p.gap; if (p.rate < lowest) lowest = p.rate; });
+    var dh = dur / 3600;
+    $("tiles").innerHTML =
+      tile("Duration", dh >= 1 ? dh.toFixed(1) + " h" : Math.round(dur / 60) + " min") +
+      tile("Venues", m.venues) +
+      tile("Rows", m.rows.toLocaleString()) +
+      tile("Disconnects", m.disc, m.disc > 0 ? "bad" : "good") +
+      tile("Lowest rate", lowest < 1e8 ? lowest.toFixed(1) + "/s" : "n/a") +
+      tile("Worst gap", Math.round(worst) + " ms", worst >= thr ? "bad" : "") +
+      tile("Stall events", events.length, events.length ? "bad" : "good");
+    drawChart(m, events, thr);
+
+    var body = $("evbody"), html = "";
+    events.forEach(function (e, i) {
+      var after = i ? ((e.t - events[i - 1].t) / 60).toFixed(1) + " min" : "";
+      html += "<tr><td>" + (i + 1) + "</td><td class='mono'>" + fmtT(e.t) + "</td><td class='num'>" + Math.round(e.gap) + " ms</td><td class='num'>" +
+        e.hit + " of " + m.venues + "</td><td class='num'>" + (e.rate < 1e8 ? e.rate.toFixed(1) + "/s" : "") + "</td><td class='num'>" + after + "</td></tr>";
+    });
+    body.innerHTML = html || "<tr><td colspan='6' class='empty'>No interval reached " + thr + " ms.</td></tr>";
+
+    var note = "";
+    if (events.length >= 2) {
+      var sp = []; for (var i = 1; i < events.length; i++) sp.push((events[i].t - events[i - 1].t) / 60);
+      sp.sort(function (a, b) { return a - b; });
+      var med = sp[Math.floor(sp.length / 2)];
+      var allV = events.every(function (e) { return e.hit >= m.venues * 0.9; });
+      note = "<b>" + events.length + " stall events.</b> Their starts are a median of <b>" + med.toFixed(1) + " minutes</b> apart." +
+        (allV ? " In every event nearly all venues were affected at once, which points at something shared by all of them." : "");
+    } else if (events.length === 1) {
+      note = "<b>One stall event</b> reached " + thr + " ms.";
+    } else {
+      note = "<b>No stall events.</b> Every interval stayed under " + thr + " ms.";
+    }
+    $("evnote").innerHTML = note;
+  }
+
+  function load(text, label, isExample) {
+    var m = parseCsv(text);
+    if (!m.pts.length) {
+      $("vstatus").textContent = "No usable rows found. The file needs the columns time, venue, msgPerSec, avgGapMs, maxGapMs, slowGaps, disconnects.";
+      return;
+    }
+    model = m;
+    $("vstatus").innerHTML = (isExample ? '<span class="tag">Example data</span> Generated in this page to show what a stall looks like. It is not a measurement. ' : "Loaded <b>" + label + "</b>. ") +
+      (m.bad ? m.bad + " lines were skipped." : "");
+    render();
+  }
+
+  function exampleCsv() {
+    var seed = 7;
+    function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+    var rows = ["time,venue,msgPerSec,avgGapMs,maxGapMs,slowGaps,disconnects"];
+    var events = [1890, 1890 + 3600.8, 1890 + 7201.6];
+    var total = 12600, iv = 5, n = 40;
+    for (var t = iv; t <= total; t += iv) {
+      var hit = false;
+      for (var k = 0; k < events.length; k++) if (events[k] >= t - iv && events[k] < t) hit = true;
+      for (var v = 1; v <= n; v++) {
+        var rate, mg, sg = 0;
+        if (hit) { rate = 32 + rnd() * 0.8; mg = 1043 + rnd() * 27; sg = 1; }
+        else {
+          rate = 38.7 + rnd() * 0.5; mg = 30 + rnd() * 30;
+          if (rnd() < 0.004) { mg = 100 + rnd() * 58; sg = 1; }
+        }
+        rows.push(t + "," + v + "," + rate.toFixed(2) + "," + (1000 / rate).toFixed(2) + "," + mg.toFixed(1) + "," + sg + ",0");
+      }
+    }
+    return rows.join("\n");
+  }
+
+  $("csvFile").addEventListener("change", function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    $("vstatus").textContent = "Reading " + f.name + " ...";
+    var r = new FileReader();
+    r.onload = function () { load(String(r.result), f.name, false); };
+    r.onerror = function () { $("vstatus").textContent = "The file could not be read."; };
+    r.readAsText(f);
+  });
+  $("thr").addEventListener("input", render);
+  $("useExample").addEventListener("click", function () { load(exampleCsv(), "", true); });
+  function setMode(m) {
+    mode = m;
+    $("m-gap").setAttribute("aria-pressed", m === "gap");
+    $("m-rate").setAttribute("aria-pressed", m === "rate");
+    render();
+  }
+  $("m-gap").addEventListener("click", function () { setMode("gap"); });
+  $("m-rate").addEventListener("click", function () { setMode("rate"); });
+
+  load(exampleCsv(), "", true);
+})();
+</script>
+
+</body></html>
